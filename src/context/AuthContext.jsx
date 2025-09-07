@@ -1,14 +1,12 @@
 // src/context/AuthContext.jsx
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import {
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
   onAuthStateChanged,
-} from "firebase/auth";
-import { auth } from "../firebase";
-
+} from 'firebase/auth';
 import {
   doc,
   getDoc,
@@ -17,18 +15,17 @@ import {
   collection,
   query,
   getDocs,
-  deleteDoc, // <-- New import
-} from "firebase/firestore";
-import { db } from "../firebase";
+  deleteDoc,
+} from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); // Add an error state
+  const [error, setError] = useState(null);
 
-  // Define createUserDocument BEFORE signInWithGoogle
   const createUserDocument = useCallback(
     async (user) => {
       if (!user) return;
@@ -47,7 +44,6 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         console.error("Error creating user document:", error);
         setError("Failed to create user profile.");
-        // Consider retrying or taking other appropriate action
       }
     },
     []
@@ -66,7 +62,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [createUserDocument]); // Add createUserDocument as a dependency
+  }, [createUserDocument]);
 
   const logout = useCallback(async () => {
     setLoading(true);
@@ -79,9 +75,8 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []); // <-- Add auth to the dependency array
+  }, []);
 
-  // NEW: Function to create a new route for the current user
   const createRoute = useCallback(async (from, to) => {
     if (!currentUser) {
       console.error("No authenticated user to create a route.");
@@ -104,33 +99,98 @@ export const AuthProvider = ({ children }) => {
   const getRoutes = useCallback(async () => {
     if (!currentUser) return [];
     try {
-      const q = query(collection(db, 'users', currentUser.uid, 'routes'));
+      const q = query(collection(db, "users", currentUser.uid, "routes"));
       const querySnapshot = await getDocs(q);
       const routes = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      console.log('Routes fetched:', routes);
+      console.log("Routes fetched:", routes);
       return routes;
     } catch (error) {
-      console.error('Error fetching routes:', error);
-      setError('Failed to fetch routes.'); // Set the error state
+      console.error("Error fetching routes:", error);
+      setError("Failed to fetch routes.");
       return [];
     }
   }, [currentUser, setError]);
 
-  // NEW: Function to delete a route
   const deleteRoute = useCallback(async (routeId) => {
     if (!currentUser) return;
     try {
-      const routeDocRef = doc(db, 'users', currentUser.uid, 'routes', routeId);
+      const routeDocRef = doc(db, "users", currentUser.uid, "routes", routeId);
       await deleteDoc(routeDocRef);
-      console.log('Route document successfully deleted!');
+      console.log("Route document successfully deleted!");
     } catch (error) {
-      console.error('Error deleting route:', error);
-      setError('Failed to delete route.');
+      console.error("Error deleting route:", error);
+      setError("Failed to delete route.");
     }
   }, [currentUser, setError]);
+
+  // NEW: Functions for Activities
+  const createActivity = useCallback(async (routeId, activityData) => {
+    if (!currentUser) return;
+    try {
+      const activitiesCollection = collection(
+        db,
+        "users",
+        currentUser.uid,
+        "routes",
+        routeId,
+        "activities"
+      );
+      await addDoc(activitiesCollection, activityData);
+      console.log("Activity successfully created!");
+    } catch (error) {
+      console.error("Error creating activity:", error);
+      setError("Failed to create activity.");
+    }
+  }, [currentUser]);
+
+  const getActivities = useCallback(async (routeId) => {
+    if (!currentUser) return [];
+    try {
+      const activitiesCollection = collection(
+        db,
+        "users",
+        currentUser.uid,
+        "routes",
+        routeId,
+        "activities"
+      );
+      const q = query(activitiesCollection);
+      const querySnapshot = await getDocs(q);
+      const activities = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      console.log("Activities fetched:", activities);
+      return activities;
+    } catch (error) {
+      console.error("Error fetching activities:", error);
+      setError("Failed to fetch activities.");
+      return [];
+    }
+  }, [currentUser]);
+
+  const deleteActivity = useCallback(async (routeId, activityId) => {
+    if (!currentUser) return;
+    try {
+      const activityDocRef = doc(
+        db,
+        "users",
+        currentUser.uid,
+        "routes",
+        routeId,
+        "activities",
+        activityId
+      );
+      await deleteDoc(activityDocRef);
+      console.log("Activity successfully deleted!");
+    } catch (error) {
+      console.error("Error deleting activity:", error);
+      setError("Failed to delete activity.");
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -147,7 +207,10 @@ export const AuthProvider = ({ children }) => {
     logout,
     createRoute,
     getRoutes,
-    deleteRoute, // <-- Add the new function to the context value
+    deleteRoute,
+    createActivity, // <-- Add new functions to context
+    getActivities,
+    deleteActivity,
     loading,
     error,
     setError,
@@ -169,3 +232,4 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   return useContext(AuthContext);
 };
+export default AuthProvider;
