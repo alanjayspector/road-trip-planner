@@ -4,7 +4,15 @@ import React from 'react';
 import { useAuth } from './context/AuthContext';
 
 function App() {
-  const { currentUser, signInWithGoogle, logout } = useAuth();
+  const { currentUser, signInWithGoogle, logout, loading, error } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
 
   return (
     <div className="App" style={{ textAlign: 'center', marginTop: '50px' }}>

@@ -1,6 +1,6 @@
 // src/context/AuthContext.jsx
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import {
   GoogleAuthProvider,
   signInWithPopup,
@@ -9,20 +9,65 @@ import {
 } from "firebase/auth";
 import { auth } from "../firebase";
 
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "../firebase";
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null); // Add an error state
 
-  const signInWithGoogle = () => {
+  // Define createUserDocument BEFORE signInWithGoogle
+  const createUserDocument = useCallback(async (user) => {
+    if (!user) return;
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(userRef);
+
+      if (!docSnap.exists()) {
+        await setDoc(userRef, {
+          displayName: user.displayName,
+          email: user.email,
+          createdAt: new Date(),
+        });
+        console.log("User document created!");
+      }
+    } catch (error) {
+      console.error("Error creating user document:", error);
+      setError("Failed to create user profile.");
+      // Consider retrying or taking other appropriate action
+    }
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     const provider = new GoogleAuthProvider();
-    return signInWithPopup(auth, provider);
-  };
+    try {
+      const result = await signInWithPopup(auth, provider);
+      await createUserDocument(result.user);
+    } catch (error) {
+      console.error("Error signing in with Google:", error);
+      setError("Failed to sign in with Google.");
+    } finally {
+      setLoading(false);
+    }
+  }, [createUserDocument]); // Add createUserDocument as a dependency
 
-  const logout = () => {
-    return signOut(auth);
-  };
+  const logout = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out:", error);
+      setError("Failed to sign out.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -30,7 +75,6 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     });
 
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
 
@@ -38,11 +82,19 @@ export const AuthProvider = ({ children }) => {
     currentUser,
     signInWithGoogle,
     logout,
+    loading,
+    error,
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {loading ? (
+        <div>Loading...</div>
+      ) : error ? (
+        <div>Error: {error}</div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };
