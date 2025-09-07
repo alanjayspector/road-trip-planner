@@ -1,24 +1,44 @@
 // src/App.jsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // <-- Updated import
 import { useAuth } from './context/AuthContext';
 
 function App() {
-  const { currentUser, signInWithGoogle, logout, loading, error } = useAuth(); // Keep loading and error
+  const { currentUser, signInWithGoogle, logout, createRoute, getRoutes, loading, error, setError } = useAuth();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [routes, setRoutes] = useState([]); // <-- New state for routes
 
-  const handleCreateRoute = (e) => {
+  const handleCreateRoute = async (e) => {
     e.preventDefault();
     if (!currentUser) return;
-
-    // TODO: We will add the Firestore logic here in the next step
-    console.log('Creating route from:', from, 'to:', to);
-
-    // Clear the form
-    setFrom('');
-    setTo('');
+    try {
+      await createRoute(from, to);
+      setFrom('');
+      setTo('');
+      // Refetch routes after creation
+      const fetchedRoutes = await getRoutes();
+      setRoutes(fetchedRoutes);
+    } catch (error) {
+      console.error('Error creating route:', error);
+    }
   };
+
+  useEffect(() => {
+    const fetchUserRoutes = async () => {
+      if (currentUser) {
+        try {
+          const fetchedRoutes = await getRoutes();
+          setRoutes(fetchedRoutes);
+        } catch (error) {
+          console.error('Error fetching routes:', error);
+          setError('Failed to fetch routes.');
+          // Display an error message to the user or take other appropriate action
+        }
+      }
+    };
+    fetchUserRoutes();
+  }, [currentUser, getRoutes, setError]); // <-- Rerun effect when currentUser changes
 
   if (loading) {
     return <div>Loading...</div>;
@@ -31,15 +51,12 @@ function App() {
   return (
     <div className="App" style={{ textAlign: 'center', marginTop: '50px' }}>
       {currentUser ? (
-        // Dashboard view for logged-in users
         <div>
           <h1>Welcome, {currentUser.displayName}!</h1>
-          <p>Your email: {currentUser.email}</p> {/* Keep this line */}
           <button onClick={logout}>Sign Out</button>
 
           <hr style={{ margin: '20px 0' }} />
 
-          {/* New route creation form */}
           <h2>Plan a New Road Trip</h2>
           <form onSubmit={handleCreateRoute}>
             <input
@@ -61,10 +78,23 @@ function App() {
             </button>
           </form>
 
-          {/* TODO: Next, we'll display a list of saved routes here */}
+          <hr style={{ margin: '20px 0' }} />
+
+          {/* NEW: Display a list of saved routes */}
+          <h2>Your Saved Road Trips</h2>
+          {routes.length > 0 ? (
+            <ul style={{ listStyle: 'none', padding: 0 }}>
+              {routes.map((route) => (
+                <li key={route.id} style={{ marginBottom: '10px' }}>
+                  <strong>From:</strong> {route.from} | <strong>To:</strong> {route.to}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No saved trips yet. Plan one above!</p>
+          )}
         </div>
       ) : (
-        // Login page view for non-logged-in users
         <div>
           <h1>Road Trip Planner</h1>
           <p>Please sign in to continue.</p>
