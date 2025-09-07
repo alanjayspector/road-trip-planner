@@ -15,8 +15,9 @@ import {
   setDoc,
   addDoc,
   collection,
-  query, // <-- Add query here
+  query,
   getDocs,
+  deleteDoc, // <-- New import
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -100,7 +101,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, [currentUser]);
 
-  // NEW: Function to get all routes for the current user
   const getRoutes = useCallback(async () => {
     if (!currentUser) return [];
     try {
@@ -117,7 +117,20 @@ export const AuthProvider = ({ children }) => {
       setError('Failed to fetch routes.'); // Set the error state
       return [];
     }
-  }, [currentUser, setError]); // Add setError as a dependency
+  }, [currentUser, setError]);
+
+  // NEW: Function to delete a route
+  const deleteRoute = useCallback(async (routeId) => {
+    if (!currentUser) return;
+    try {
+      const routeDocRef = doc(db, 'users', currentUser.uid, 'routes', routeId);
+      await deleteDoc(routeDocRef);
+      console.log('Route document successfully deleted!');
+    } catch (error) {
+      console.error('Error deleting route:', error);
+      setError('Failed to delete route.');
+    }
+  }, [currentUser, setError]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -134,9 +147,10 @@ export const AuthProvider = ({ children }) => {
     logout,
     createRoute,
     getRoutes,
+    deleteRoute, // <-- Add the new function to the context value
     loading,
     error,
-    setError, // <-- Add setError here
+    setError,
   };
 
   return (
