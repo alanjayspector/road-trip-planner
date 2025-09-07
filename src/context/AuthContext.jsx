@@ -1,4 +1,4 @@
-// src/context/AuthContext.js
+// src/context/AuthContext.jsx
 
 import { createContext, useContext, useEffect, useState } from "react";
 import {
@@ -15,21 +15,17 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Function to handle Google sign-in
   const signInWithGoogle = () => {
     const provider = new GoogleAuthProvider();
     return signInWithPopup(auth, provider);
   };
 
-  // Function to handle user sign-out
   const logout = () => {
     return signOut(auth);
   };
 
-  // Use an effect to listen for changes in the auth state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log("Auth state changed:", user);
       setCurrentUser(user);
       setLoading(false);
     });
